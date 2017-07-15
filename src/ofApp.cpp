@@ -41,8 +41,10 @@ void ofApp::setup(){
 //--------------------------------------------------------------
 void ofApp::update(){
 	targetVolume = 1-myTobii.eventParams.Y / ofGetHeight();
-	if (targetVolume >= 0.98)
+	if (targetVolume > 0.98)
 		targetVolume = 0.98;
+	if (targetVolume < 0.1)
+		targetVolume = 0;
 }
 
 
