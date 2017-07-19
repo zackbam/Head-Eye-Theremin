@@ -2,6 +2,7 @@
 
 #include "ofMain.h"
 #include "tobii.h"
+#include <tobii_streams.h>
 
 class ofApp : public ofBaseApp{
 
@@ -10,7 +11,7 @@ class ofApp : public ofBaseApp{
 		void setup();
 		void update();
 		void draw();
-
+		void exit();
 		void keyPressed  (int key);
 		void keyReleased(int key);
 		void mouseMoved(int x, int y );
@@ -24,8 +25,7 @@ class ofApp : public ofBaseApp{
 		void gotMessage(ofMessage msg);
 		
 		void audioOut(float * input, int bufferSize, int nChannels);
-		tobii myTobii;
-		
+
 		ofSoundStream soundStream;
 
 		float 	pan;
@@ -42,4 +42,9 @@ class ofApp : public ofBaseApp{
 		float 	phase;
 		float 	phaseAdder;
 		float 	phaseAdderTarget;
+		tobii_error_t error;
+		tobii_device_t* device;
+		tobii_api_t* api;
+		static float gaze[2];
+		static float head[3];
 };

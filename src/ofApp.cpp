@@ -1,6 +1,41 @@
 #include "ofApp.h"
+#include <assert.h>
 #define RANGE 25.0
 //--------------------------------------------------------------
+float ofApp::gaze[2];
+float ofApp::head[3];
+void gaze_point_callback(tobii_gaze_point_t const* gaze_point, void* user_data)
+{
+	if (gaze_point->validity == TOBII_VALIDITY_VALID)
+		for (int i = 0; i < 2; i++)
+		{
+			ofApp::gaze[i] = gaze_point->position_xy[i];
+		}
+}
+void head_pose_callback(tobii_head_pose_t const* head_pose, void* user_data)
+{
+	for (int i = 0; i < 3; ++i)
+		if (head_pose->rotation_validity_xyz[i] == TOBII_VALIDITY_VALID) {
+			ofApp::head[i] = head_pose->rotation_xyz[i];
+			//printf("%f ", head_pose->rotation_xyz[i]);
+		}
+	//printf("\n");
+	/*for (int i = 0; i < 3; ++i)
+		if (head_pose->position_validity == TOBII_VALIDITY_VALID)
+			ofApp::head[i] = head_pose->position_xyz[i];*/
+}
+
+void ofApp::exit() {
+	error = tobii_gaze_point_unsubscribe(device);
+	assert(error == TOBII_ERROR_NO_ERROR);
+	error = tobii_head_pose_unsubscribe(device);
+	assert(error == TOBII_ERROR_NO_ERROR);
+	error = tobii_device_destroy(device);
+	assert(error == TOBII_ERROR_NO_ERROR);
+	error = tobii_api_destroy(api);
+	assert(error == TOBII_ERROR_NO_ERROR);
+}
+
 void ofApp::setup(){
 
 	ofBackground(34, 34, 34);
@@ -19,6 +54,7 @@ void ofApp::setup(){
 	volume				= 0.1f;
 	bNoise 				= false;
 
+	pan = 0.5f;
 	lAudio.assign(bufferSize, 0.0);
 	rAudio.assign(bufferSize, 0.0);
 	
@@ -32,24 +68,40 @@ void ofApp::setup(){
 	// on OSX: if you want to use ofSoundPlayer together with ofSoundStream you need to synchronize buffersizes.
 	// use ofFmodSetBuffersize(bufferSize) to set the buffersize in fmodx prior to loading a file.
 	
-	ofSetFrameRate(60);
+	ofSetFrameRate(120);
 
-	myTobii.setup();
+	targetVolume = 0.8;
+	error = tobii_api_create(&api, NULL, NULL);
+	assert(error == TOBII_ERROR_NO_ERROR);
+	error = tobii_device_create(api, NULL, &device);
+	assert(error == TOBII_ERROR_NO_ERROR);
+	error = tobii_gaze_point_subscribe(device, gaze_point_callback, 0);
+	assert(error == TOBII_ERROR_NO_ERROR);
+	error = tobii_head_pose_subscribe(device, head_pose_callback, 0);
+	assert(error == TOBII_ERROR_NO_ERROR);
 }
 
 
 //--------------------------------------------------------------
 void ofApp::update(){
-	targetVolume = 1-myTobii.eventParams.Y / ofGetHeight();
+	error = tobii_wait_for_callbacks(device);
+	assert(error == TOBII_ERROR_NO_ERROR || error == TOBII_ERROR_TIMED_OUT);
+	error = tobii_process_callbacks(device);
+	assert(error == TOBII_ERROR_NO_ERROR);
+	targetVolume = ((1 - gaze[1]) * ofGetScreenHeight() - ofGetWindowPositionY())/ ofGetScreenHeight();
 	if (targetVolume > 0.98)
 		targetVolume = 0.98;
 	if (targetVolume < 0.1)
 		targetVolume = 0;
+	float widthPct = (0.5 - head[1])  * RANGE/12.f;
+	targetFrequency = 127.0958*pow(2, widthPct);//half semitone under DO_3
+	phaseAdderTarget = (targetFrequency / (float)sampleRate) * TWO_PI;
 }
 
 
 //--------------------------------------------------------------
 void ofApp::draw(){
+	ofSetLineWidth(1);
 	for (int i = 0; i < (int)RANGE; i++) {
 		int semi = i % 12;
 		if (semi == 0 || semi == 2 || semi == 4 || semi == 5 || semi == 7 || semi == 9 || semi == 11)
@@ -66,7 +118,12 @@ void ofApp::draw(){
 
 	ofNoFill();
 
-	ofCircle(ofPoint(myTobii.eventParams.X - ofGetWindowPositionX(), myTobii.eventParams.Y - ofGetWindowPositionY()), ofGetHeight()*0.06);
+	ofSetLineWidth(5);
+	ofSetColor(120, 120, 120);
+	//ofCircle(ofPoint(gaze[0]*ofGetScreenWidth()-ofGetWindowPositionX(), gaze[1]*ofGetScreenHeight() - ofGetWindowPositionY()), ofGetScreenHeight()*0.06);
+	ofLine(ofPoint(0, gaze[1] * ofGetScreenHeight() - ofGetWindowPositionY()), ofPoint(ofGetWidth(), gaze[1] * ofGetScreenHeight() - ofGetWindowPositionY()));
+	ofLine(ofPoint((0.5 - head[1]) * ofGetWidth(), 0), ofPoint((0.5 - head[1]) * ofGetWidth(), ofGetHeight()));
+	//ofCircle(ofPoint((0.5-head[1]) * ofGetWidth(), (0.5-head[0]) * ofGetHeight()), head[2]*ofGetWidth());
 	//ofDrawRectangle(0, myTobii.eventParams.Y*1.1, ofGetWidth(), myTobii.eventParams.Y*0.9);
 }
 
@@ -100,10 +157,10 @@ void ofApp::keyReleased  (int key){
 
 //--------------------------------------------------------------
 void ofApp::mouseMoved(int x, int y ){
-	float width = (float)ofGetWidth();
-	float widthPct = x / width * RANGE/12.f;
-	targetFrequency = 127.0958*pow(2,widthPct);//half semitone under DO_3
-	phaseAdderTarget = (targetFrequency / (float) sampleRate) * TWO_PI;
+	//float width = (float)ofGetWidth();
+	//float widthPct = x / width * RANGE/12.f;
+	//targetFrequency = 127.0958*pow(2,widthPct);//half semitone under DO_3
+	//phaseAdderTarget = (targetFrequency / (float) sampleRate) * TWO_PI;
 }
 
 //--------------------------------------------------------------
@@ -139,7 +196,6 @@ void ofApp::windowResized(int w, int h){
 
 //--------------------------------------------------------------
 void ofApp::audioOut(float * output, int bufferSize, int nChannels){
-	//pan = 0.5f;
 	float leftScale = 1 - pan;
 	float rightScale = pan;
 
