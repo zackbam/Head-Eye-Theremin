@@ -42,9 +42,15 @@ class ofApp : public ofBaseApp{
 		float 	phase;
 		float 	phaseAdder;
 		float 	phaseAdderTarget;
+
+		//float   vibPhase;
+		//float 	vibPhaseAdder;
+		//float vibWidth;
 		tobii_error_t error;
 		tobii_device_t* device;
 		tobii_api_t* api;
 		static float gaze[2];
 		static float head[3];
+		int pitchInput, VolumeInput,vibratoInput;
+
 };
