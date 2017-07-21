@@ -43,9 +43,9 @@ class ofApp : public ofBaseApp{
 		float 	phaseAdder;
 		float 	phaseAdderTarget;
 
-		//float   vibPhase;
-		//float 	vibPhaseAdder;
-		//float vibWidth;
+		float   vibPhase;
+		float 	vibPhaseAdder;
+		float vibWidth;
 		tobii_error_t error;
 		tobii_device_t* device;
 		tobii_api_t* api;
